@@ -1,23 +1,92 @@
 import React, { createContext, useContext, useState } from 'react';
 
-interface OnboardingData {
+interface PersonalInfo {
   fullName: string;
+  address: string;
+  age: string;
+  profession: string;
   email: string;
   password: string;
-  plan: 'free' | 'pro' | 'enterprise';
-  botName: string;
+  phone: string;
+  language: string;
+  timezone: string;
+  marketingOptIn: boolean;
+  oauthProvider: string | null;
+}
+
+interface BusinessDocument {
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+}
+
+interface BusinessInfo {
+  purpose: string;
+  businessName: string;
+  website: string;
   industry: string;
+  companySize: string;
+  region: string;
+  documents: BusinessDocument[];
+}
+
+interface BotSetup {
+  botName: string;
   botDescription: string;
+  avatar: string;
+  starters: string[];
+}
+
+interface OnboardingData {
+  personal: PersonalInfo;
+  business: BusinessInfo;
+  bot: BotSetup;
+  plan: 'free' | 'pro' | 'enterprise';
 }
 
 interface OnboardingContextType {
   step: number;
   setStep: (step: number) => void;
   data: OnboardingData;
-  updateData: (data: Partial<OnboardingData>) => void;
+  updatePersonalInfo: (data: Partial<PersonalInfo>) => void;
+  updateBusinessInfo: (data: Partial<BusinessInfo>) => void;
+  updateBotSetup: (data: Partial<BotSetup>) => void;
+  updatePlan: (plan: 'free' | 'pro' | 'enterprise') => void;
   isOnboardingComplete: boolean;
   completeOnboarding: () => void;
 }
+
+const defaultPersonalInfo: PersonalInfo = {
+  fullName: '',
+  address: '',
+  age: '',
+  profession: '',
+  email: '',
+  password: '',
+  phone: '',
+  language: 'English (US)',
+  timezone: 'GMT-5 (Eastern Time)',
+  marketingOptIn: false,
+  oauthProvider: null,
+};
+
+const defaultBusinessInfo: BusinessInfo = {
+  purpose: '',
+  businessName: '',
+  website: '',
+  industry: '',
+  companySize: '',
+  region: '',
+  documents: [],
+};
+
+const defaultBotSetup: BotSetup = {
+  botName: '',
+  botDescription: '',
+  avatar: '🤖',
+  starters: ['What services do you offer?', 'How can I contact support?', 'What are your business hours?'],
+};
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
@@ -26,18 +95,58 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(() => {
     return localStorage.getItem('onboardingComplete') === 'true';
   });
-  const [data, setData] = useState<OnboardingData>({
-    fullName: '',
-    email: '',
-    password: '',
-    plan: 'free',
-    botName: '',
-    industry: '',
-    botDescription: '',
+
+  const [data, setData] = useState<OnboardingData>(() => {
+    const saved = localStorage.getItem('onboardingData');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
+    }
+    return {
+      personal: defaultPersonalInfo,
+      business: defaultBusinessInfo,
+      bot: defaultBotSetup,
+      plan: 'free',
+    };
   });
 
-  const updateData = (newData: Partial<OnboardingData>) => {
-    setData(prev => ({ ...prev, ...newData }));
+  const saveToLocalStorage = (newData: OnboardingData) => {
+    localStorage.setItem('onboardingData', JSON.stringify(newData));
+  };
+
+  const updatePersonalInfo = (newData: Partial<PersonalInfo>) => {
+    setData(prev => {
+      const updated = { ...prev, personal: { ...prev.personal, ...newData } };
+      saveToLocalStorage(updated);
+      return updated;
+    });
+  };
+
+  const updateBusinessInfo = (newData: Partial<BusinessInfo>) => {
+    setData(prev => {
+      const updated = { ...prev, business: { ...prev.business, ...newData } };
+      saveToLocalStorage(updated);
+      return updated;
+    });
+  };
+
+  const updateBotSetup = (newData: Partial<BotSetup>) => {
+    setData(prev => {
+      const updated = { ...prev, bot: { ...prev.bot, ...newData } };
+      saveToLocalStorage(updated);
+      return updated;
+    });
+  };
+
+  const updatePlan = (plan: 'free' | 'pro' | 'enterprise') => {
+    setData(prev => {
+      const updated = { ...prev, plan };
+      saveToLocalStorage(updated);
+      return updated;
+    });
   };
 
   const completeOnboarding = () => {
@@ -46,7 +155,17 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <OnboardingContext.Provider value={{ step, setStep, data, updateData, isOnboardingComplete, completeOnboarding }}>
+    <OnboardingContext.Provider value={{
+      step,
+      setStep,
+      data,
+      updatePersonalInfo,
+      updateBusinessInfo,
+      updateBotSetup,
+      updatePlan,
+      isOnboardingComplete,
+      completeOnboarding
+    }}>
       {children}
     </OnboardingContext.Provider>
   );

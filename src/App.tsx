@@ -9,8 +9,10 @@ import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext"
 // Onboarding
 import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
 import { CreateAccountScreen } from "@/components/onboarding/CreateAccountScreen";
-import { EmailVerificationScreen } from "@/components/onboarding/EmailVerificationScreen";
+import { PersonalInfoScreen } from "@/components/onboarding/PersonalInfoScreen";
+import { BusinessInfoScreen } from "@/components/onboarding/BusinessInfoScreen";
 import { ChoosePlanScreen } from "@/components/onboarding/ChoosePlanScreen";
+import { EmailVerificationScreen } from "@/components/onboarding/EmailVerificationScreen";
 import { InitialSetupScreen } from "@/components/onboarding/InitialSetupScreen";
 
 // Main App
@@ -29,6 +31,7 @@ import Settings from "@/pages/Settings";
 import Billing from "@/pages/Billing";
 import Support from "@/pages/Support";
 import NotFound from "@/pages/NotFound";
+import CreateBotManual from "@/pages/CreateBotManual";
 
 const queryClient = new QueryClient();
 
@@ -39,12 +42,14 @@ function OnboardingFlow() {
     case 1:
       return <WelcomeScreen />;
     case 2:
-      return <CreateAccountScreen />;
+      return <PersonalInfoScreen />;
     case 3:
-      return <EmailVerificationScreen />;
+      return <BusinessInfoScreen />;
     case 4:
       return <ChoosePlanScreen />;
     case 5:
+      return <EmailVerificationScreen />;
+    case 6:
       return <InitialSetupScreen />;
     default:
       return <WelcomeScreen />;
@@ -63,7 +68,9 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard/create-bot-manual" element={<CreateBotManual />} />
         <Route path="/chatbots" element={<MyChatbots />} />
+        <Route path="/chatbots/new" element={<BotBuilder />} />
         <Route path="/chatbots/:botId" element={<BotBuilder />} />
         <Route path="/chat-preview/:botId" element={<ChatPreview />} />
         <Route path="/documents" element={<Documents />} />

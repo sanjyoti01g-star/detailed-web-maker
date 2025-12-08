@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,24 +24,22 @@ const industries = [
 const avatars = ['🤖', '💬', '🎯', '🚀', '💡', '⭐', '🔥', '💎'];
 
 export function InitialSetupScreen() {
-  const { setStep, data, updateData, completeOnboarding } = useOnboarding();
-  const [selectedAvatar, setSelectedAvatar] = useState('🤖');
-  const [starters, setStarters] = useState([
-    'What services do you offer?',
-    'How can I contact support?',
-    'What are your business hours?',
-  ]);
+  const { setStep, data, updateBotSetup, completeOnboarding } = useOnboarding();
+  const [selectedAvatar, setSelectedAvatar] = useState(data.bot.avatar);
+  const [starters, setStarters] = useState(data.bot.starters);
+  const [industry, setIndustry] = useState(data.business.industry || '');
 
-  const isValid = data.botName && data.industry;
+  const isValid = data.bot.botName && industry;
 
   const handleComplete = () => {
+    updateBotSetup({ avatar: selectedAvatar, starters });
     completeOnboarding();
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-5xl w-full animate-fade-in">
-        <OnboardingProgress currentStep={4} totalSteps={5} />
+        <OnboardingProgress currentStep={6} totalSteps={6} />
         
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Form */}
@@ -55,22 +53,22 @@ export function InitialSetupScreen() {
                 <Input
                   id="botName"
                   placeholder="e.g., Customer Support Bot"
-                  value={data.botName}
-                  onChange={(e) => updateData({ botName: e.target.value })}
+                  value={data.bot.botName}
+                  onChange={(e) => updateBotSetup({ botName: e.target.value })}
                   className="mt-1.5"
                 />
               </div>
 
               <div>
                 <Label htmlFor="industry">Industry/Category *</Label>
-                <Select value={data.industry} onValueChange={(value) => updateData({ industry: value })}>
+                <Select value={industry} onValueChange={setIndustry}>
                   <SelectTrigger className="mt-1.5">
                     <SelectValue placeholder="Select an industry" />
                   </SelectTrigger>
                   <SelectContent>
-                    {industries.map((industry) => (
-                      <SelectItem key={industry} value={industry}>
-                        {industry}
+                    {industries.map((ind) => (
+                      <SelectItem key={ind} value={ind}>
+                        {ind}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -82,13 +80,13 @@ export function InitialSetupScreen() {
                 <Textarea
                   id="description"
                   placeholder="Describe what your bot will help with..."
-                  value={data.botDescription}
-                  onChange={(e) => updateData({ botDescription: e.target.value })}
+                  value={data.bot.botDescription}
+                  onChange={(e) => updateBotSetup({ botDescription: e.target.value })}
                   className="mt-1.5 min-h-[100px]"
                   maxLength={500}
                 />
                 <p className="text-xs text-muted-foreground mt-1 text-right">
-                  {data.botDescription.length}/500
+                  {data.bot.botDescription.length}/500
                 </p>
               </div>
 
@@ -180,7 +178,7 @@ export function InitialSetupScreen() {
                 </div>
                 <div>
                   <p className="font-medium text-primary-foreground">
-                    {data.botName || 'Your Bot Name'}
+                    {data.bot.botName || 'Your Bot Name'}
                   </p>
                   <p className="text-xs text-primary-foreground/70">Online</p>
                 </div>
@@ -194,7 +192,7 @@ export function InitialSetupScreen() {
                   </div>
                   <div className="bg-muted rounded-lg rounded-tl-none p-3 max-w-[80%]">
                     <p className="text-sm text-foreground">
-                      Hi! I'm {data.botName || 'your assistant'}. How can I help you today?
+                      Hi! I'm {data.bot.botName || 'your assistant'}. How can I help you today?
                     </p>
                   </div>
                 </div>
@@ -236,7 +234,7 @@ export function InitialSetupScreen() {
         </div>
 
         <div className="flex justify-center mt-6">
-          <Button variant="ghost" onClick={() => setStep(4)}>
+          <Button variant="ghost" onClick={() => setStep(5)}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>

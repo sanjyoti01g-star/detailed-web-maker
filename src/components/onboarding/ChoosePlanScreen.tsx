@@ -34,7 +34,7 @@ const plans = [
 ];
 
 export function ChoosePlanScreen() {
-  const { setStep, data, updateData } = useOnboarding();
+  const { setStep, data, updatePlan } = useOnboarding();
   const [isYearly, setIsYearly] = useState(false);
 
   return (
