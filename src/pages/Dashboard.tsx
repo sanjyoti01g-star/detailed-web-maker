@@ -1,6 +1,7 @@
-import { Bot, MessageSquare, Users, Clock, Plus, Upload, BarChart3, UserPlus, TrendingUp, TrendingDown } from 'lucide-react';
+import { Bot, MessageSquare, Users, Clock, Plus, Upload, BarChart3, UserPlus, TrendingUp, TrendingDown, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { mockBots, mockActivity } from '@/data/mockData';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,10 +36,27 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-foreground">Welcome back, John! 👋</h1>
           <p className="text-muted-foreground">{currentDate}</p>
         </div>
-        <Button onClick={() => navigate('/chatbots/new')} className="w-full sm:w-auto">
-          <Plus className="w-4 h-4" />
-          Create New Bot
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate('/chatbots/new')} className="w-full sm:w-auto">
+            <Plus className="w-4 h-4" />
+            Create New Bot
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/dashboard/create-bot-manual')}
+                className="w-full sm:w-auto"
+              >
+                <Settings2 className="w-4 h-4" />
+                Create Bot Manually
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Build a bot step-by-step (manual configuration & templates)</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* KPI Cards */}

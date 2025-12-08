@@ -8,13 +8,13 @@ import { useOnboarding } from '@/contexts/OnboardingContext';
 import { OnboardingProgress } from './OnboardingProgress';
 
 export function CreateAccountScreen() {
-  const { setStep, data, updateData } = useOnboarding();
+  const { setStep, data, updatePersonalInfo } = useOnboarding();
   const [showPassword, setShowPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreed, setAgreed] = useState(false);
 
   const passwordStrength = () => {
-    const password = data.password;
+    const password = data.personal.password;
     if (password.length < 6) return { level: 0, text: 'Too short', color: 'text-destructive' };
     if (password.length < 8) return { level: 1, text: 'Weak', color: 'text-warning' };
     if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)) {
@@ -24,27 +24,27 @@ export function CreateAccountScreen() {
   };
 
   const strength = passwordStrength();
-  const passwordsMatch = data.password === confirmPassword && confirmPassword.length > 0;
-  const isValid = data.fullName && data.email && data.password.length >= 8 && passwordsMatch && agreed;
+  const passwordsMatch = data.personal.password === confirmPassword && confirmPassword.length > 0;
+  const isValid = data.personal.fullName && data.personal.email && data.personal.password.length >= 8 && passwordsMatch && agreed;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-md w-full animate-fade-in">
-        <OnboardingProgress currentStep={1} totalSteps={5} />
+        <OnboardingProgress currentStep={1} totalSteps={6} />
         
         <div className="mt-8 bg-card rounded-2xl border border-border shadow-elevation-2 p-8">
           <h2 className="text-2xl font-bold text-foreground mb-2">Create Account</h2>
           <p className="text-muted-foreground mb-6">Join thousands of businesses using AI chatbots</p>
 
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (isValid) setStep(3); }}>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (isValid) setStep(2); }}>
             <div>
               <Label htmlFor="fullName">Full Name</Label>
               <Input
                 id="fullName"
                 type="text"
                 placeholder="John Doe"
-                value={data.fullName}
-                onChange={(e) => updateData({ fullName: e.target.value })}
+                value={data.personal.fullName}
+                onChange={(e) => updatePersonalInfo({ fullName: e.target.value })}
                 className="mt-1.5"
               />
             </div>
@@ -55,8 +55,8 @@ export function CreateAccountScreen() {
                 id="email"
                 type="email"
                 placeholder="john@example.com"
-                value={data.email}
-                onChange={(e) => updateData({ email: e.target.value })}
+                value={data.personal.email}
+                onChange={(e) => updatePersonalInfo({ email: e.target.value })}
                 className="mt-1.5"
               />
             </div>
@@ -68,8 +68,8 @@ export function CreateAccountScreen() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Create a strong password"
-                  value={data.password}
-                  onChange={(e) => updateData({ password: e.target.value })}
+                  value={data.personal.password}
+                  onChange={(e) => updatePersonalInfo({ password: e.target.value })}
                   className="pr-10"
                 />
                 <button
@@ -80,7 +80,7 @@ export function CreateAccountScreen() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              {data.password && (
+              {data.personal.password && (
                 <div className="mt-2 flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                     <div
@@ -132,7 +132,7 @@ export function CreateAccountScreen() {
             </div>
 
             <Button type="submit" variant="hero" className="w-full" disabled={!isValid}>
-              Create Account
+              Continue to Personal Info
               <ArrowRight className="w-4 h-4" />
             </Button>
           </form>
