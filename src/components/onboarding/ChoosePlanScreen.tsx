@@ -88,7 +88,7 @@ export function ChoosePlanScreen() {
                   : 'border-border bg-card hover:border-primary/50',
                 data.plan === plan.id && 'ring-2 ring-primary'
               )}
-              onClick={() => updateData({ plan: plan.id })}
+              onClick={() => updatePlan(plan.id)}
             >
               {plan.recommended && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
