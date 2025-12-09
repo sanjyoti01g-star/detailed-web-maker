@@ -1,11 +1,20 @@
 import { useState } from 'react';
-import { ArrowLeft, Send, RotateCcw, Bug, Info, Activity, TestTube, Bot } from 'lucide-react';
+import { ArrowLeft, Send, RotateCcw, Bug, Code, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { mockConversations, mockBots } from '@/data/mockData';
 import { useNavigate, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 const debugTabs = ['Context', 'Metadata', 'Session', 'Test Scenarios'];
 
@@ -18,6 +27,24 @@ export default function ChatPreview() {
   const [input, setInput] = useState('');
   const [activeDebugTab, setActiveDebugTab] = useState('Context');
   const [isTyping, setIsTyping] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Generate embed code for this bot
+  const embedCode = `<script src="https://widget.yourapp.com/chat.js"></script>
+<script>
+  ChatWidget.init({
+    botId: "${bot.id}",
+    theme: "light",
+    position: "bottom-right"
+  });
+</script>`;
+
+  const copyEmbedCode = () => {
+    navigator.clipboard.writeText(embedCode);
+    setCopied(true);
+    toast.success('Embed code copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const sendMessage = () => {
     if (!input.trim()) return;
@@ -43,20 +70,59 @@ export default function ChatPreview() {
   return (
     <div className="h-[calc(100vh-8rem)] lg:h-[calc(100vh-6rem)] flex flex-col animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/chatbots')}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">{bot.avatar}</span>
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">{bot.name}</h1>
-            <span className="text-sm text-success flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-success" />
-              Active
-            </span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/chatbots')}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{bot.avatar}</span>
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">{bot.name}</h1>
+              <span className="text-sm text-success flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-success" />
+                Active
+              </span>
+            </div>
           </div>
         </div>
+        
+        {/* Embed Link Button */}
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Code className="w-4 h-4" />
+              Get Embed Code
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Embed {bot.name}</DialogTitle>
+              <DialogDescription>
+                Copy and paste this code into your website to add the chatbot widget.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="relative">
+                <pre className="p-4 bg-muted rounded-lg text-sm overflow-x-auto font-mono">
+                  {embedCode}
+                </pre>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="absolute top-2 right-2 gap-1"
+                  onClick={copyEmbedCode}
+                >
+                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Place this code just before the closing <code className="bg-muted px-1 py-0.5 rounded">&lt;/body&gt;</code> tag on your website.
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Main Content */}
