@@ -68,7 +68,7 @@ export function EmailVerificationScreen() {
           <h2 className="text-2xl font-bold text-foreground mb-2">Verify Your Email</h2>
           <p className="text-muted-foreground mb-8">
             We sent a 6-digit code to<br />
-            <span className="font-medium text-foreground">{data.email || 'your@email.com'}</span>
+            <span className="font-medium text-foreground">{data.personal.email || 'your@email.com'}</span>
           </p>
 
           <div className="flex justify-center gap-2 mb-8" onPaste={handlePaste}>
