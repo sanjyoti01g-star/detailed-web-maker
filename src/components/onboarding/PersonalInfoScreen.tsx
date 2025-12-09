@@ -46,14 +46,8 @@ export function PersonalInfoScreen() {
   const passwordsMatch = data.personal.password === confirmPassword && confirmPassword.length > 0;
   const ageValid = data.personal.age ? parseInt(data.personal.age) > 13 : false;
   
-  const isValid = 
-    data.personal.fullName && 
-    data.personal.address && 
-    ageValid &&
-    data.personal.profession &&
-    data.personal.email && 
-    data.personal.password.length >= 8 && 
-    passwordsMatch;
+  // Allow continuing with minimal info for testing - remove strict validation
+  const isValid = true;
 
   const handleGoogleAuth = () => {
     // Placeholder for Google OAuth

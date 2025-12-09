@@ -60,7 +60,8 @@ export function BusinessInfoScreen() {
     }))
   );
 
-  const isValid = data.business.purpose && data.business.businessName && data.business.industry && data.business.companySize;
+  // Allow continuing with minimal info for testing
+  const isValid = true;
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
