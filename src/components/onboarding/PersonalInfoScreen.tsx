@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Check, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Check, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { OnboardingProgress } from './OnboardingProgress';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const professions = ['Designer', 'Engineer', 'Manager', 'Owner', 'Student', 'Developer', 'Marketer', 'Consultant', 'Other'];
 
@@ -29,8 +30,10 @@ const timezones = [
 
 export function PersonalInfoScreen() {
   const { setStep, data, updatePersonalInfo } = useOnboarding();
+  const { signUp } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const passwordStrength = () => {
     const password = data.personal.password;
@@ -46,8 +49,7 @@ export function PersonalInfoScreen() {
   const passwordsMatch = data.personal.password === confirmPassword && confirmPassword.length > 0;
   const ageValid = data.personal.age ? parseInt(data.personal.age) > 13 : false;
   
-  // Allow continuing with minimal info for testing - remove strict validation
-  const isValid = true;
+  const isValid = data.personal.fullName && data.personal.email && data.personal.password.length >= 8 && passwordsMatch;
 
   const handleGoogleAuth = () => {
     // Placeholder for Google OAuth
@@ -55,11 +57,30 @@ export function PersonalInfoScreen() {
     updatePersonalInfo({ oauthProvider: 'google' });
   };
 
-  const handleContinue = () => {
-    if (isValid) {
-      toast.success('Personal info saved!');
-      setStep(3); // Move to Business Info
+  const handleContinue = async () => {
+    if (!isValid) return;
+    
+    setIsSubmitting(true);
+    
+    const { error } = await signUp(
+      data.personal.email,
+      data.personal.password,
+      data.personal.fullName
+    );
+    
+    if (error) {
+      if (error.message.includes('already registered')) {
+        toast.error('This email is already registered. Please sign in instead.');
+      } else {
+        toast.error(error.message || 'Failed to create account');
+      }
+      setIsSubmitting(false);
+      return;
     }
+    
+    toast.success('Account created successfully!');
+    setStep(3); // Move to Business Info
+    setIsSubmitting(false);
   };
 
   return (
@@ -284,9 +305,18 @@ export function PersonalInfoScreen() {
               </div>
             </div>
 
-            <Button type="submit" variant="hero" className="w-full" disabled={!isValid}>
-              Save & Continue
-              <ArrowRight className="w-4 h-4" />
+            <Button type="submit" variant="hero" className="w-full" disabled={!isValid || isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  Save & Continue
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </form>
         </div>

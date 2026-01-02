@@ -139,7 +139,12 @@ export function CreateAccountScreen() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{' '}
-            <button className="text-primary font-medium hover:underline">Sign In</button>
+            <button 
+              className="text-primary font-medium hover:underline"
+              onClick={() => setStep(7)}
+            >
+              Sign In
+            </button>
           </p>
         </div>
 
