@@ -14,7 +14,187 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          chatbot_id: string
+          created_at: string
+          id: string
+          last_activity_at: string
+          metadata: Json | null
+          session_token: string
+          visitor_id: string | null
+        }
+        Insert: {
+          chatbot_id: string
+          created_at?: string
+          id?: string
+          last_activity_at?: string
+          metadata?: Json | null
+          session_token?: string
+          visitor_id?: string | null
+        }
+        Update: {
+          chatbot_id?: string
+          created_at?: string
+          id?: string
+          last_activity_at?: string
+          metadata?: Json | null
+          session_token?: string
+          visitor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbots: {
+        Row: {
+          avatar: string | null
+          created_at: string
+          description: string | null
+          embed_token: string
+          id: string
+          is_active: boolean
+          model: string
+          name: string
+          provider: Database["public"]["Enums"]["ai_provider"]
+          settings: Json | null
+          system_prompt: string | null
+          template_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar?: string | null
+          created_at?: string
+          description?: string | null
+          embed_token?: string
+          id?: string
+          is_active?: boolean
+          model?: string
+          name: string
+          provider?: Database["public"]["Enums"]["ai_provider"]
+          settings?: Json | null
+          system_prompt?: string | null
+          template_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar?: string | null
+          created_at?: string
+          description?: string | null
+          embed_token?: string
+          id?: string
+          is_active?: boolean
+          model?: string
+          name?: string
+          provider?: Database["public"]["Enums"]["ai_provider"]
+          settings?: Json | null
+          system_prompt?: string | null
+          template_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_api_keys: {
+        Row: {
+          created_at: string
+          encrypted_key: string
+          id: string
+          is_active: boolean
+          key_hint: string | null
+          provider: Database["public"]["Enums"]["ai_provider"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_key: string
+          id?: string
+          is_active?: boolean
+          key_hint?: string | null
+          provider: Database["public"]["Enums"]["ai_provider"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_key?: string
+          id?: string
+          is_active?: boolean
+          key_hint?: string | null
+          provider?: Database["public"]["Enums"]["ai_provider"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +203,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      ai_provider: "openai" | "gemini" | "anthropic" | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +330,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      ai_provider: ["openai", "gemini", "anthropic", "custom"],
+    },
   },
 } as const
