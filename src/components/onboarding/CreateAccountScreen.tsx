@@ -141,7 +141,7 @@ export function CreateAccountScreen() {
             Already have an account?{' '}
             <button 
               className="text-primary font-medium hover:underline"
-              onClick={() => setStep(7)}
+              onClick={() => setStep(6)}
             >
               Sign In
             </button>
