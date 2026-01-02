@@ -13,7 +13,7 @@ import { CreateAccountScreen } from "@/components/onboarding/CreateAccountScreen
 import { PersonalInfoScreen } from "@/components/onboarding/PersonalInfoScreen";
 import { BusinessInfoScreen } from "@/components/onboarding/BusinessInfoScreen";
 import { ChoosePlanScreen } from "@/components/onboarding/ChoosePlanScreen";
-import { EmailVerificationScreen } from "@/components/onboarding/EmailVerificationScreen";
+// EmailVerificationScreen removed - auto-confirm is enabled
 import { InitialSetupScreen } from "@/components/onboarding/InitialSetupScreen";
 import { SignInScreen } from "@/components/onboarding/SignInScreen";
 
@@ -50,10 +50,8 @@ function OnboardingFlow() {
     case 4:
       return <ChoosePlanScreen />;
     case 5:
-      return <EmailVerificationScreen />;
-    case 6:
       return <InitialSetupScreen />;
-    case 7:
+    case 6:
       return <SignInScreen />;
     default:
       return <WelcomeScreen />;

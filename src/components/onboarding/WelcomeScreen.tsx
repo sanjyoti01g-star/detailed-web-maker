@@ -59,7 +59,7 @@ export function WelcomeScreen() {
           <Button
             variant="outline"
             size="xl"
-            onClick={() => setStep(7)}
+            onClick={() => setStep(6)}
           >
             Sign In
           </Button>
