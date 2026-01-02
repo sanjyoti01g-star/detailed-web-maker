@@ -25,7 +25,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const navItems = [
   { icon: Home, label: 'Dashboard', path: '/dashboard' },
@@ -43,10 +45,21 @@ const navItems = [
 
 export function AppShell() {
   const { theme, toggleTheme } = useTheme();
+  const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+
+  const handleSignOut = async () => {
+    await signOut();
+    localStorage.removeItem('onboardingComplete');
+    localStorage.removeItem('onboardingData');
+    toast.success('Signed out successfully');
+    window.location.reload();
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -160,7 +173,7 @@ export function AppShell() {
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                     <User className="w-4 h-4 text-primary" />
                   </div>
-                  <span className="hidden sm:block text-sm font-medium text-foreground">John Doe</span>
+                  <span className="hidden sm:block text-sm font-medium text-foreground">{userName}</span>
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </button>
 
@@ -183,8 +196,8 @@ export function AppShell() {
                       </button>
                       <button
                         onClick={() => {
-                          localStorage.removeItem('onboardingComplete');
-                          window.location.reload();
+                          setUserMenuOpen(false);
+                          handleSignOut();
                         }}
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-accent"
                       >

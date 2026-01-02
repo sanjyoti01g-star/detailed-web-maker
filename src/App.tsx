@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 // Onboarding
 import { WelcomeScreen } from "@/components/onboarding/WelcomeScreen";
@@ -14,6 +15,7 @@ import { BusinessInfoScreen } from "@/components/onboarding/BusinessInfoScreen";
 import { ChoosePlanScreen } from "@/components/onboarding/ChoosePlanScreen";
 import { EmailVerificationScreen } from "@/components/onboarding/EmailVerificationScreen";
 import { InitialSetupScreen } from "@/components/onboarding/InitialSetupScreen";
+import { SignInScreen } from "@/components/onboarding/SignInScreen";
 
 // Main App
 import { AppShell } from "@/components/layout/AppShell";
@@ -51,6 +53,8 @@ function OnboardingFlow() {
       return <EmailVerificationScreen />;
     case 6:
       return <InitialSetupScreen />;
+    case 7:
+      return <SignInScreen />;
     default:
       return <WelcomeScreen />;
   }
@@ -58,8 +62,17 @@ function OnboardingFlow() {
 
 function AppRoutes() {
   const { isOnboardingComplete } = useOnboarding();
+  const { user, loading } = useAuth();
 
-  if (!isOnboardingComplete) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isOnboardingComplete || !user) {
     return <OnboardingFlow />;
   }
 
@@ -91,15 +104,17 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
-      <OnboardingProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
-      </OnboardingProvider>
+      <AuthProvider>
+        <OnboardingProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </TooltipProvider>
+        </OnboardingProvider>
+      </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
