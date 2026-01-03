@@ -130,6 +130,20 @@ serve(async (req) => {
       });
     }
 
+    // Check and deduct credit before processing
+    const { data: creditResult, error: creditError } = await supabase
+      .rpc('check_and_deduct_credit', { p_user_id: chatbot.user_id });
+
+    if (creditError || creditResult === false) {
+      console.log('Credit check failed for user:', chatbot.user_id, creditError);
+      return new Response(JSON.stringify({ 
+        error: 'Insufficient credits. Please upgrade your plan.' 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Get user's API key for this provider
     const { data: apiKeyData, error: apiKeyError } = await supabase
       .from('user_api_keys')

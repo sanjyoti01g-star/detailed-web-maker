@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ArrowLeft, Save, Eye, Settings, FileText, Palette, Brain, Code, Upload, Globe, Plus, X, GripVertical } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Save, Eye, Settings, FileText, Palette, Brain, Code, Upload, Globe, Plus, X, GripVertical, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { useNavigate, useParams } from 'react-router-dom';
 import { mockBots } from '@/data/mockData';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: Settings },
@@ -299,45 +301,166 @@ export default function BotBuilder() {
         )}
 
         {activeTab === 'embed' && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>JavaScript Embed (Recommended)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="p-4 bg-muted rounded-lg overflow-x-auto text-sm">
-                  <code>{`<script>
-  (function(w,d,s,o,f,js,fjs){
-    w['ChatBotWidget']=o;
-    js = d.createElement(s);
-    js.id = o; js.src = f; js.async = 1;
-    fjs.parentNode.insertBefore(js, fjs);
-  }(window, document, 'script', 'chatbot', 
-    'https://cdn.chatbot.ai/widget.js'));
-  chatbot('init', { botId: '${botId || 'bot_new'}' });
-</script>`}</code>
-                </pre>
-                <Button variant="outline" className="mt-4">Copy Code</Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Domain Whitelist</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Only these domains can embed your chatbot
-                </p>
-                <div className="flex gap-2">
-                  <Input placeholder="https://example.com" />
-                  <Button>Add Domain</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <EmbedTab botId={botId} isNew={isNew} />
         )}
       </div>
+    </div>
+  );
+}
+
+// Separate component for Embed tab with its own state
+function EmbedTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
+  const [embedToken, setEmbedToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState<'script' | 'iframe' | null>(null);
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+  useEffect(() => {
+    async function fetchEmbedToken() {
+      if (isNew || !botId) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('chatbots')
+        .select('embed_token')
+        .eq('id', botId)
+        .maybeSingle();
+
+      if (data?.embed_token) {
+        setEmbedToken(data.embed_token);
+      }
+      setLoading(false);
+    }
+
+    fetchEmbedToken();
+  }, [botId, isNew]);
+
+  const scriptEmbedCode = embedToken
+    ? `<script src="${supabaseUrl}/functions/v1/widget?token=${embedToken}"></script>`
+    : '';
+
+  const iframeEmbedCode = embedToken
+    ? `<iframe 
+  src="${supabaseUrl}/functions/v1/widget?token=${embedToken}&format=iframe"
+  style="position: fixed; bottom: 20px; right: 20px; width: 400px; height: 600px; border: none; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);"
+  allow="microphone"
+></iframe>`
+    : '';
+
+  const copyCode = (code: string, type: 'script' | 'iframe') => {
+    navigator.clipboard.writeText(code);
+    setCopied(type);
+    toast.success('Embed code copied to clipboard!');
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (isNew || !embedToken) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Code className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">Save Your Bot First</h3>
+          <p className="text-muted-foreground">
+            You need to save your chatbot before you can get the embed code.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>JavaScript Embed (Recommended)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Add this script tag to your website. The widget will appear automatically.
+          </p>
+          <div className="relative">
+            <pre className="p-4 bg-muted rounded-lg overflow-x-auto text-sm font-mono">
+              <code>{scriptEmbedCode}</code>
+            </pre>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="absolute top-2 right-2 gap-1"
+              onClick={() => copyCode(scriptEmbedCode, 'script')}
+            >
+              {copied === 'script' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copied === 'script' ? 'Copied!' : 'Copy'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>iFrame Embed (Alternative)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Use this if you prefer an iframe-based embed.
+          </p>
+          <div className="relative">
+            <pre className="p-4 bg-muted rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap">
+              <code>{iframeEmbedCode}</code>
+            </pre>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="absolute top-2 right-2 gap-1"
+              onClick={() => copyCode(iframeEmbedCode, 'iframe')}
+            >
+              {copied === 'iframe' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copied === 'iframe' ? 'Copied!' : 'Copy'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Test Your Embed</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Try your embed code on our demo page to see how it looks on an external website.
+          </p>
+          <Button variant="outline" asChild>
+            <a href="/demo-embed" target="_blank" rel="noopener noreferrer">
+              Open Demo Embed Page
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Domain Whitelist</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Only these domains can embed your chatbot
+          </p>
+          <div className="flex gap-2">
+            <Input placeholder="https://example.com" />
+            <Button>Add Domain</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
