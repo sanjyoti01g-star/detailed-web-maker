@@ -35,6 +35,7 @@ import Support from "@/pages/Support";
 import NotFound from "@/pages/NotFound";
 import CreateBotManual from "@/pages/CreateBotManual";
 import DemoEmbed from "@/pages/DemoEmbed";
+import Admin from "@/pages/Admin";
 
 const queryClient = new QueryClient();
 
@@ -95,6 +96,7 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/support" element={<Support />} />
+        <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

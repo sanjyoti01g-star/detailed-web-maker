@@ -196,8 +196,40 @@ serve(async (req) => {
       .update({ last_activity_at: new Date().toISOString() })
       .eq('id', session.id);
 
-    // Build messages array
-    const systemPrompt = chatbot.system_prompt || 'You are a helpful assistant.';
+    // Fetch documents for this chatbot (knowledge base)
+    const { data: documents } = await supabase
+      .from('documents')
+      .select('name, extracted_text')
+      .eq('chatbot_id', chatbot.id)
+      .eq('status', 'processed');
+
+    // Build knowledge base context from documents
+    let knowledgeBase = '';
+    if (documents && documents.length > 0) {
+      console.log(`Found ${documents.length} documents for chatbot ${chatbot.id}`);
+      knowledgeBase = documents.map(doc => 
+        `--- Document: ${doc.name} ---\n${doc.extracted_text}`
+      ).join('\n\n');
+    }
+
+    // Build system prompt with document knowledge
+    let systemPrompt = chatbot.system_prompt || 'You are a helpful assistant.';
+    
+    if (knowledgeBase) {
+      systemPrompt = `${systemPrompt}
+
+IMPORTANT KNOWLEDGE BASE:
+You have access to the following documents uploaded by the user. ALWAYS prioritize information from these documents when answering questions. If the user asks about something that's covered in these documents, use the document content as your primary source.
+
+${knowledgeBase}
+
+---
+When answering:
+1. If the answer is in the documents above, use that information and you may mention which document it came from.
+2. If the information is not in the documents, you can provide general assistance but mention that the specific information wasn't found in the uploaded knowledge base.
+3. Always be helpful and accurate.`;
+    }
+
     let allMessages = [{ role: 'system', content: systemPrompt }];
 
     if (providedMessages && providedMessages.length > 0) {
