@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Eye, Settings, FileText, Palette, Brain, Code, Upload, Globe, Plus, X, GripVertical, Copy, Check } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Save, Eye, Settings, FileText, Palette, Brain, Code, Upload, Globe, Plus, X, GripVertical, Copy, Check, Trash2, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,6 +11,7 @@ import { mockBots } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: Settings },
@@ -201,35 +202,7 @@ export default function BotBuilder() {
         )}
 
         {activeTab === 'training' && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upload Documents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                  <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-foreground font-medium mb-1">Drag & drop files here</p>
-                  <p className="text-sm text-muted-foreground">PDF, DOCX, TXT, CSV (Max 10MB per file)</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Add Website URLs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input placeholder="Enter website URL to crawl" className="pl-9" />
-                  </div>
-                  <Button>Add URL</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <TrainingTab botId={botId} isNew={isNew} />
         )}
 
         {activeTab === 'appearance' && (
@@ -304,6 +277,323 @@ export default function BotBuilder() {
           <EmbedTab botId={botId} isNew={isNew} />
         )}
       </div>
+    </div>
+  );
+}
+
+// Training Tab Component with document upload
+interface Document {
+  id: string;
+  name: string;
+  file_type: string;
+  file_size: number;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+}
+
+function TrainingTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (botId && !isNew) {
+      fetchDocuments();
+    } else {
+      setLoading(false);
+    }
+  }, [botId, isNew]);
+
+  const fetchDocuments = async () => {
+    if (!botId) return;
+    
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('chatbot_id', botId)
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      setDocuments(data);
+    }
+    setLoading(false);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (!user) {
+      toast.error('Please sign in to upload documents');
+      return;
+    }
+    if (!botId || isNew) {
+      toast.error('Please save the chatbot first before uploading documents');
+      return;
+    }
+
+    setUploading(true);
+
+    for (const file of Array.from(files)) {
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} is too large. Max size is 10MB.`);
+        continue;
+      }
+
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'text/plain', 'text/csv', 'application/json', 'text/markdown'];
+      const allowedExtensions = ['.pdf', '.txt', '.csv', '.json', '.md'];
+      const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+      
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
+        toast.error(`${file.name} is not a supported file type.`);
+        continue;
+      }
+
+      try {
+        // Upload to storage
+        const filePath = `${user.id}/${botId}/${Date.now()}_${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast.error(`Failed to upload ${file.name}`);
+          continue;
+        }
+
+        // Create document record
+        const { data: docRecord, error: docError } = await supabase
+          .from('documents')
+          .insert({
+            user_id: user.id,
+            chatbot_id: botId,
+            name: file.name,
+            file_path: filePath,
+            file_type: file.type || ext.slice(1),
+            file_size: file.size,
+            status: 'pending',
+          })
+          .select()
+          .single();
+
+        if (docError || !docRecord) {
+          console.error('Document record error:', docError);
+          toast.error(`Failed to create record for ${file.name}`);
+          continue;
+        }
+
+        // Add to local state immediately
+        setDocuments(prev => [docRecord, ...prev]);
+
+        // Trigger document processing
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              documentId: docRecord.id,
+              filePath,
+              fileType: file.type || ext.slice(1),
+            }),
+          }).then(async (response) => {
+            if (response.ok) {
+              // Refresh documents to get updated status
+              fetchDocuments();
+              toast.success(`${file.name} processed successfully`);
+            } else {
+              const error = await response.json();
+              console.error('Processing error:', error);
+              fetchDocuments(); // Refresh to show failed status
+            }
+          }).catch(err => {
+            console.error('Processing request error:', err);
+            fetchDocuments();
+          });
+        }
+
+        toast.success(`${file.name} uploaded, processing...`);
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast.error(`Failed to upload ${file.name}`);
+      }
+    }
+
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteDocument = async (doc: Document) => {
+    if (!user) return;
+
+    try {
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('documents')
+        .remove([`${user.id}/${botId}/${doc.name}`]);
+
+      // Delete record (even if storage delete fails)
+      const { error: dbError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', doc.id);
+
+      if (dbError) {
+        toast.error('Failed to delete document');
+        return;
+      }
+
+      setDocuments(prev => prev.filter(d => d.id !== doc.id));
+      toast.success('Document deleted');
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete document');
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'processed':
+        return <CheckCircle className="w-4 h-4 text-success" />;
+      case 'processing':
+      case 'pending':
+        return <Loader2 className="w-4 h-4 text-warning animate-spin" />;
+      case 'failed':
+        return <AlertCircle className="w-4 h-4 text-destructive" />;
+      default:
+        return null;
+    }
+  };
+
+  if (isNew) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">Save Your Bot First</h3>
+          <p className="text-muted-foreground">
+            You need to save your chatbot before you can upload training documents.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Upload Documents</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.txt,.csv,.json,.md,text/plain,application/pdf,text/csv,application/json,text/markdown"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <div 
+            className={cn(
+              "border-2 border-dashed border-border rounded-xl p-8 text-center transition-colors cursor-pointer",
+              uploading ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50"
+            )}
+            onClick={() => !uploading && fileInputRef.current?.click()}
+          >
+            {uploading ? (
+              <Loader2 className="w-10 h-10 text-primary mx-auto mb-4 animate-spin" />
+            ) : (
+              <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
+            )}
+            <p className="text-foreground font-medium mb-1">
+              {uploading ? 'Uploading...' : 'Drag & drop files here or click to browse'}
+            </p>
+            <p className="text-sm text-muted-foreground">PDF, TXT, CSV, JSON, MD (Max 10MB per file)</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Documents List */}
+      {documents.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Uploaded Documents ({documents.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {documents.map((doc) => (
+                <div 
+                  key={doc.id}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText className="w-5 h-5 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{doc.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(doc.file_size)} • {doc.file_type}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      {getStatusIcon(doc.status)}
+                      <span className={cn(
+                        "text-xs capitalize",
+                        doc.status === 'processed' && "text-success",
+                        doc.status === 'failed' && "text-destructive",
+                        (doc.status === 'pending' || doc.status === 'processing') && "text-warning"
+                      )}>
+                        {doc.status}
+                      </span>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => handleDeleteDocument(doc)}
+                    >
+                      <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Add Website URLs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Enter website URL to crawl (coming soon)" className="pl-9" disabled />
+            </div>
+            <Button disabled>Add URL</Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">Website crawling feature coming soon.</p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

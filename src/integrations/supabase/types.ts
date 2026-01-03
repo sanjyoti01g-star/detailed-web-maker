@@ -135,6 +135,59 @@ export type Database = {
         }
         Relationships: []
       }
+      documents: {
+        Row: {
+          chatbot_id: string | null
+          created_at: string
+          error_message: string | null
+          extracted_text: string | null
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chatbot_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          extracted_text?: string | null
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chatbot_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          extracted_text?: string | null
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_chatbot_id_fkey"
+            columns: ["chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "chatbots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           bot_limit: number
@@ -207,15 +260,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       check_and_deduct_credit: { Args: { p_user_id: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      setup_admin_by_email: { Args: { admin_email: string }; Returns: boolean }
     }
     Enums: {
       ai_provider: "openai" | "gemini" | "anthropic" | "custom"
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -344,6 +427,7 @@ export const Constants = {
   public: {
     Enums: {
       ai_provider: ["openai", "gemini", "anthropic", "custom"],
+      app_role: ["admin", "user"],
     },
   },
 } as const
