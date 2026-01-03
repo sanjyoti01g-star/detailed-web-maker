@@ -34,6 +34,7 @@ import Billing from "@/pages/Billing";
 import Support from "@/pages/Support";
 import NotFound from "@/pages/NotFound";
 import CreateBotManual from "@/pages/CreateBotManual";
+import DemoEmbed from "@/pages/DemoEmbed";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/demo-embed" element={<DemoEmbed />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<Dashboard />} />

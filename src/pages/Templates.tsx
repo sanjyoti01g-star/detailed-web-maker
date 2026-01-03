@@ -7,7 +7,7 @@ import { mockTemplates } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
-const categories = ['All Templates', 'Customer Support', 'Sales & Marketing', 'E-commerce', 'Education', 'Healthcare', 'HR & Recruitment', 'Real Estate', 'Finance'];
+const categories = ['All Templates', 'Healthcare', 'Education', 'E-Commerce', 'Finance', 'Customer Support', 'Real Estate', 'Travel', 'Manufacturing', 'Legal', 'HR'];
 
 export default function Templates() {
   const navigate = useNavigate();

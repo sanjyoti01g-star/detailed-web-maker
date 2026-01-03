@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Send, RotateCcw, Bug, Code, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { mockConversations, mockBots } from '@/data/mockData';
 import { useNavigate, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -28,16 +29,34 @@ export default function ChatPreview() {
   const [activeDebugTab, setActiveDebugTab] = useState('Context');
   const [isTyping, setIsTyping] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [embedToken, setEmbedToken] = useState<string | null>(null);
 
-  // Generate embed code for this bot
-  const embedCode = `<script src="https://widget.yourapp.com/chat.js"></script>
-<script>
-  ChatWidget.init({
-    botId: "${bot.id}",
-    theme: "light",
-    position: "bottom-right"
-  });
-</script>`;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+  // Fetch real embed token from database
+  useEffect(() => {
+    async function fetchEmbedToken() {
+      if (!botId) return;
+
+      const { data } = await supabase
+        .from('chatbots')
+        .select('embed_token')
+        .eq('id', botId)
+        .maybeSingle();
+
+      if (data?.embed_token) {
+        setEmbedToken(data.embed_token);
+      }
+    }
+
+    fetchEmbedToken();
+  }, [botId]);
+
+  // Generate real embed code
+  const embedCode = embedToken
+    ? `<script src="${supabaseUrl}/functions/v1/widget?token=${embedToken}"></script>`
+    : `<!-- Save your bot first to get the embed code -->
+<script src="${supabaseUrl}/functions/v1/widget?token=YOUR_TOKEN"></script>`;
 
   const copyEmbedCode = () => {
     navigator.clipboard.writeText(embedCode);

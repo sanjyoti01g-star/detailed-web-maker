@@ -137,26 +137,38 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bot_limit: number
           created_at: string
+          credits_balance: number
           email: string | null
           full_name: string | null
           id: string
+          plan_tier: string
+          storage_limit_mb: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          bot_limit?: number
           created_at?: string
+          credits_balance?: number
           email?: string | null
           full_name?: string | null
           id?: string
+          plan_tier?: string
+          storage_limit_mb?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          bot_limit?: number
           created_at?: string
+          credits_balance?: number
           email?: string | null
           full_name?: string | null
           id?: string
+          plan_tier?: string
+          storage_limit_mb?: number
           updated_at?: string
           user_id?: string
         }
@@ -200,7 +212,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_and_deduct_credit: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {
       ai_provider: "openai" | "gemini" | "anthropic" | "custom"
