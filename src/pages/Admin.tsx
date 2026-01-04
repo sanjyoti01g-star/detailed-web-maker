@@ -66,10 +66,6 @@ export default function Admin() {
       }
 
       // Check admin status via edge function
-      const { data, error } = await supabase.functions.invoke('admin', {
-        body: {},
-        headers: {},
-      }, );
 
       // Use query params for action
       const response = await fetch(
