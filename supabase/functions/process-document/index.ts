@@ -67,7 +67,7 @@ serve(async (req) => {
         .update({ status: 'failed', error_message: 'Failed to download file' })
         .eq('id', documentId);
       
-      return new Response(JSON.stringify({ error: 'Failed to download file' }), {
+      return new Response(JSON.stringify({ error: 'Failed to process document' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -180,13 +180,12 @@ serve(async (req) => {
         .from('documents')
         .update({ 
           status: 'failed', 
-          error_message: extractError instanceof Error ? extractError.message : 'Failed to extract text'
+          error_message: 'Failed to extract text from document'
         })
         .eq('id', documentId);
 
       return new Response(JSON.stringify({ 
-        error: 'Failed to extract text from document',
-        details: extractError instanceof Error ? extractError.message : 'Unknown error'
+        error: 'Failed to process document. Please try again or use a different file format.'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -196,7 +195,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in process-document function:', error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: 'An unexpected error occurred. Please try again.' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

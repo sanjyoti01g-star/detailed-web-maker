@@ -137,7 +137,8 @@ serve(async (req) => {
     if (creditError || creditResult === false) {
       console.log('Credit check failed for user:', chatbot.user_id, creditError);
       return new Response(JSON.stringify({ 
-        error: 'Insufficient credits. Please upgrade your plan.' 
+        error: 'Insufficient credits. Please upgrade your plan.',
+        code: 'INSUFFICIENT_CREDITS'
       }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -155,7 +156,10 @@ serve(async (req) => {
 
     if (apiKeyError || !apiKeyData) {
       console.error('API key not found:', apiKeyError);
-      return new Response(JSON.stringify({ error: 'API key not configured for this provider' }), {
+      return new Response(JSON.stringify({ 
+        error: 'API key not configured for this provider',
+        code: 'MISSING_API_KEY'
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -282,8 +286,12 @@ When answering:
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error('AI API error:', aiResponse.status, errorText);
-      return new Response(JSON.stringify({ error: 'AI provider error', details: errorText }), {
-        status: aiResponse.status,
+      // Return generic error to client, log details server-side
+      return new Response(JSON.stringify({ 
+        error: 'AI provider temporarily unavailable. Please try again.',
+        code: 'AI_PROVIDER_ERROR'
+      }), {
+        status: 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -299,7 +307,10 @@ When answering:
 
   } catch (error) {
     console.error('Error in chat function:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
+    return new Response(JSON.stringify({ 
+      error: 'An unexpected error occurred. Please try again.',
+      code: 'INTERNAL_ERROR'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

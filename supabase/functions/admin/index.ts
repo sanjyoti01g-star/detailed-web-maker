@@ -6,6 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Valid plan tiers
+const VALID_PLANS = ['Free', 'Pro', 'Business', 'Enterprise'];
+const MAX_CREDITS = 1000000;
+const MIN_CREDITS = 0;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -128,12 +133,48 @@ serve(async (req) => {
       case 'update-credits': {
         const { userId, newCredits } = await req.json();
 
-        if (!userId || typeof newCredits !== 'number') {
-          return new Response(JSON.stringify({ error: 'User ID and new credits amount required' }), {
+        // Validate userId
+        if (!userId || typeof userId !== 'string') {
+          return new Response(JSON.stringify({ error: 'Valid User ID required' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+
+        // Validate credits is a number
+        if (typeof newCredits !== 'number') {
+          return new Response(JSON.stringify({ error: 'Credits must be a number' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Validate credits is an integer
+        if (!Number.isInteger(newCredits)) {
+          return new Response(JSON.stringify({ error: 'Credits must be a whole number' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Validate credits range
+        if (newCredits < MIN_CREDITS || newCredits > MAX_CREDITS) {
+          return new Response(JSON.stringify({ 
+            error: `Credits must be between ${MIN_CREDITS} and ${MAX_CREDITS.toLocaleString()}` 
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get previous balance for audit log
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('credits_balance')
+          .eq('user_id', userId)
+          .single();
+
+        const previousCredits = profile?.credits_balance ?? 0;
 
         const { error: updateError } = await supabase
           .from('profiles')
@@ -148,9 +189,15 @@ serve(async (req) => {
           });
         }
 
-        console.log(`Credits updated for user ${userId}: ${newCredits}`);
+        // Audit log
+        console.log(`Admin ${user.id} changed credits for user ${userId} from ${previousCredits} to ${newCredits}`);
 
-        return new Response(JSON.stringify({ success: true, userId, newCredits }), {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          userId, 
+          newCredits,
+          previousCredits
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -158,8 +205,27 @@ serve(async (req) => {
       case 'update-plan': {
         const { userId, newPlan } = await req.json();
 
-        if (!userId || !newPlan) {
-          return new Response(JSON.stringify({ error: 'User ID and new plan required' }), {
+        // Validate userId
+        if (!userId || typeof userId !== 'string') {
+          return new Response(JSON.stringify({ error: 'Valid User ID required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Validate plan
+        if (!newPlan || typeof newPlan !== 'string') {
+          return new Response(JSON.stringify({ error: 'Valid plan required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Validate plan is in allowed list
+        if (!VALID_PLANS.includes(newPlan)) {
+          return new Response(JSON.stringify({ 
+            error: `Plan must be one of: ${VALID_PLANS.join(', ')}` 
+          }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
@@ -178,7 +244,7 @@ serve(async (req) => {
           });
         }
 
-        console.log(`Plan updated for user ${userId}: ${newPlan}`);
+        console.log(`Admin ${user.id} updated plan for user ${userId} to ${newPlan}`);
 
         return new Response(JSON.stringify({ success: true, userId, newPlan }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -202,7 +268,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in admin function:', error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: 'An unexpected error occurred' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
