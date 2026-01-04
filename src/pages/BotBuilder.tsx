@@ -5,9 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mockBots } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -24,19 +22,151 @@ const tabs = [
 const industries = ['Customer Support', 'Sales', 'Education', 'Healthcare', 'E-commerce', 'Real Estate', 'Finance', 'HR & Recruitment', 'IT Support', 'Other'];
 const avatars = ['🤖', '💬', '🎯', '🚀', '💡', '⭐', '🔥', '💎'];
 
+interface ChatbotData {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar: string | null;
+  template_type: string;
+  system_prompt: string | null;
+  is_active: boolean;
+  embed_token: string;
+  settings: unknown;
+}
+
 export default function BotBuilder() {
   const navigate = useNavigate();
   const { botId } = useParams();
+  const { user } = useAuth();
   const isNew = botId === 'new';
-  const bot = !isNew ? mockBots.find((b) => b.id === botId) : null;
 
   const [activeTab, setActiveTab] = useState('overview');
-  const [botName, setBotName] = useState(bot?.name || '');
-  const [description, setDescription] = useState(bot?.description || '');
-  const [industry, setIndustry] = useState(bot?.category || '');
-  const [selectedAvatar, setSelectedAvatar] = useState(bot?.avatar || '🤖');
+  const [loading, setLoading] = useState(!isNew);
+  const [saving, setSaving] = useState(false);
+  
+  // Chatbot data
+  const [chatbot, setChatbot] = useState<ChatbotData | null>(null);
+  const [botName, setBotName] = useState('');
+  const [description, setDescription] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState('🤖');
+  const [systemPrompt, setSystemPrompt] = useState('');
   const [starters, setStarters] = useState(['What services do you offer?', 'How can I contact support?', 'What are your business hours?']);
   const [primaryColor, setPrimaryColor] = useState('#6750a4');
+
+  useEffect(() => {
+    if (!isNew && botId) {
+      fetchChatbot();
+    }
+  }, [botId, isNew]);
+
+  const fetchChatbot = async () => {
+    const { data, error } = await supabase
+      .from('chatbots')
+      .select('*')
+      .eq('id', botId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching chatbot:', error);
+      toast.error('Failed to load chatbot');
+      navigate('/chatbots');
+      return;
+    }
+
+    if (data) {
+      setChatbot(data);
+      setBotName(data.name);
+      setDescription(data.description || '');
+      setIndustry(data.template_type || '');
+      setSelectedAvatar(data.avatar || '🤖');
+      setSystemPrompt(data.system_prompt || '');
+      
+      // Parse settings for starters and colors
+      const settings = data.settings as Record<string, unknown> | null;
+      if (settings?.starters && Array.isArray(settings.starters)) {
+        setStarters(settings.starters as string[]);
+      }
+      if (settings?.primaryColor && typeof settings.primaryColor === 'string') {
+        setPrimaryColor(settings.primaryColor);
+      }
+    }
+    setLoading(false);
+  };
+
+  const handleSave = async () => {
+    if (!user) {
+      toast.error('Please sign in to save');
+      return;
+    }
+
+    if (!botName.trim()) {
+      toast.error('Please enter a bot name');
+      return;
+    }
+
+    setSaving(true);
+
+    const chatbotData = {
+      name: botName.trim(),
+      description: description.trim() || null,
+      avatar: selectedAvatar,
+      template_type: industry || 'custom',
+      system_prompt: systemPrompt.trim() || null,
+      settings: {
+        starters,
+        primaryColor,
+      },
+    };
+
+    try {
+      if (isNew) {
+        // Create new chatbot
+        const { data, error } = await supabase
+          .from('chatbots')
+          .insert({
+            ...chatbotData,
+            user_id: user.id,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        toast.success('Chatbot created successfully!');
+        // Navigate to the new chatbot's edit page
+        navigate(`/chatbots/${data.id}`, { replace: true });
+      } else {
+        // Update existing chatbot
+        const { error } = await supabase
+          .from('chatbots')
+          .update(chatbotData)
+          .eq('id', botId);
+
+        if (error) throw error;
+
+        toast.success('Changes saved!');
+        // Refresh chatbot data
+        fetchChatbot();
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error('Failed to save chatbot');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Get the actual chatbot ID (either from loaded data or null for new)
+  const actualBotId = chatbot?.id || null;
 
   return (
     <div className="space-y-6 pb-16 lg:pb-0 animate-fade-in">
@@ -52,21 +182,35 @@ export default function BotBuilder() {
               <h1 className="text-xl font-semibold text-foreground">
                 {isNew ? 'Create New Bot' : botName || 'Untitled Bot'}
               </h1>
-              <span className="text-sm text-success flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-success" />
-                Active
-              </span>
+              {chatbot && (
+                <span className={cn(
+                  "text-sm flex items-center gap-1",
+                  chatbot.is_active ? "text-success" : "text-warning"
+                )}>
+                  <span className={cn(
+                    "w-2 h-2 rounded-full",
+                    chatbot.is_active ? "bg-success" : "bg-warning"
+                  )} />
+                  {chatbot.is_active ? 'Active' : 'Paused'}
+                </span>
+              )}
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate(`/chat-preview/${botId || 'bot_1'}`)}>
-            <Eye className="w-4 h-4" />
-            Preview
-          </Button>
-          <Button>
-            <Save className="w-4 h-4" />
-            Save Changes
+          {actualBotId && (
+            <Button variant="outline" onClick={() => navigate(`/chat-preview/${actualBotId}`)}>
+              <Eye className="w-4 h-4" />
+              Preview
+            </Button>
+          )}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            {isNew ? 'Create Bot' : 'Save Changes'}
           </Button>
         </div>
       </div>
@@ -202,7 +346,7 @@ export default function BotBuilder() {
         )}
 
         {activeTab === 'training' && (
-          <TrainingTab botId={botId} isNew={isNew} />
+          <TrainingTab botId={actualBotId} isNew={isNew || !actualBotId} />
         )}
 
         {activeTab === 'appearance' && (
@@ -252,12 +396,17 @@ export default function BotBuilder() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="persona">Persona Description</Label>
+                <Label htmlFor="systemPrompt">System Prompt</Label>
                 <Textarea
-                  id="persona"
+                  id="systemPrompt"
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
                   placeholder="Describe your bot's personality, expertise, and how it should interact with users..."
                   className="mt-1.5 min-h-[150px]"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  This prompt will guide how your bot responds to users.
+                </p>
               </div>
               <div>
                 <Label>Tone</Label>
@@ -274,7 +423,7 @@ export default function BotBuilder() {
         )}
 
         {activeTab === 'embed' && (
-          <EmbedTab botId={botId} isNew={isNew} />
+          <EmbedTab botId={actualBotId} isNew={isNew || !actualBotId} embedToken={chatbot?.embed_token} />
         )}
       </div>
     </div>
@@ -290,9 +439,10 @@ interface Document {
   status: string;
   error_message: string | null;
   created_at: string;
+  file_path: string;
 }
 
-function TrainingTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
+function TrainingTab({ botId, isNew }: { botId: string | null; isNew: boolean }) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -434,15 +584,15 @@ function TrainingTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
   };
 
   const handleDeleteDocument = async (doc: Document) => {
-    if (!user) return;
+    if (!user || !botId) return;
 
     try {
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
+      // Delete from storage using the stored file_path
+      await supabase.storage
         .from('documents')
-        .remove([`${user.id}/${botId}/${doc.name}`]);
+        .remove([doc.file_path]);
 
-      // Delete record (even if storage delete fails)
+      // Delete record
       const { error: dbError } = await supabase
         .from('documents')
         .delete()
@@ -481,7 +631,7 @@ function TrainingTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
     }
   };
 
-  if (isNew) {
+  if (isNew || !botId) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
@@ -531,7 +681,11 @@ function TrainingTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
       </Card>
 
       {/* Documents List */}
-      {documents.length > 0 && (
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      ) : documents.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>Uploaded Documents ({documents.length})</CardTitle>
@@ -577,7 +731,7 @@ function TrainingTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -599,34 +753,10 @@ function TrainingTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
 }
 
 // Separate component for Embed tab with its own state
-function EmbedTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
-  const [embedToken, setEmbedToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+function EmbedTab({ botId, isNew, embedToken }: { botId: string | null; isNew: boolean; embedToken?: string }) {
   const [copied, setCopied] = useState<'script' | 'iframe' | null>(null);
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
-  useEffect(() => {
-    async function fetchEmbedToken() {
-      if (isNew || !botId) {
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('chatbots')
-        .select('embed_token')
-        .eq('id', botId)
-        .maybeSingle();
-
-      if (data?.embed_token) {
-        setEmbedToken(data.embed_token);
-      }
-      setLoading(false);
-    }
-
-    fetchEmbedToken();
-  }, [botId, isNew]);
 
   const scriptEmbedCode = embedToken
     ? `<script src="${supabaseUrl}/functions/v1/widget?token=${embedToken}"></script>`
@@ -647,15 +777,7 @@ function EmbedTab({ botId, isNew }: { botId?: string; isNew: boolean }) {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (isNew || !embedToken) {
+  if (isNew || !botId || !embedToken) {
     return (
       <Card>
         <CardContent className="py-12 text-center">

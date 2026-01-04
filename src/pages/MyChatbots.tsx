@@ -1,24 +1,137 @@
-import { useState } from 'react';
-import { Plus, Search, Filter, Grid, List, MoreHorizontal, Eye, BarChart3, Edit, Copy, Archive, Trash2, Bot } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, Filter, Grid, List, MoreHorizontal, Eye, BarChart3, Edit, Copy, Archive, Trash2, Bot, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { mockBots } from '@/data/mockData';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+
+interface Chatbot {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar: string | null;
+  is_active: boolean;
+  template_type: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function MyChatbots() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [chatbots, setChatbots] = useState<Chatbot[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredBots = mockBots.filter((bot) => {
+  useEffect(() => {
+    if (user) {
+      fetchChatbots();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
+
+  const fetchChatbots = async () => {
+    const { data, error } = await supabase
+      .from('chatbots')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching chatbots:', error);
+      toast.error('Failed to load chatbots');
+    } else {
+      setChatbots(data || []);
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteChatbot = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this chatbot? This action cannot be undone.')) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from('chatbots')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting chatbot:', error);
+      toast.error('Failed to delete chatbot');
+    } else {
+      setChatbots(prev => prev.filter(bot => bot.id !== id));
+      toast.success('Chatbot deleted');
+    }
+    setOpenMenu(null);
+  };
+
+  const handleDuplicateChatbot = async (bot: Chatbot) => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('chatbots')
+      .insert({
+        user_id: user.id,
+        name: `${bot.name} (Copy)`,
+        description: bot.description,
+        avatar: bot.avatar,
+        template_type: bot.template_type,
+        is_active: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error duplicating chatbot:', error);
+      toast.error('Failed to duplicate chatbot');
+    } else if (data) {
+      setChatbots(prev => [data, ...prev]);
+      toast.success('Chatbot duplicated');
+    }
+    setOpenMenu(null);
+  };
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from('chatbots')
+      .update({ is_active: !currentStatus })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating chatbot:', error);
+      toast.error('Failed to update chatbot');
+    } else {
+      setChatbots(prev => prev.map(bot => 
+        bot.id === id ? { ...bot, is_active: !currentStatus } : bot
+      ));
+      toast.success(currentStatus ? 'Chatbot paused' : 'Chatbot activated');
+    }
+    setOpenMenu(null);
+  };
+
+  const filteredBots = chatbots.filter((bot) => {
     const matchesSearch = bot.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filter === 'all' || bot.status === filter;
+    const matchesFilter = filter === 'all' || 
+      (filter === 'active' && bot.is_active) || 
+      (filter === 'paused' && !bot.is_active);
     return matchesSearch && matchesFilter;
   });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-16 lg:pb-0 animate-fade-in">
@@ -90,22 +203,22 @@ export default function MyChatbots() {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="text-3xl">{bot.avatar}</div>
+                    <div className="text-3xl">{bot.avatar || '🤖'}</div>
                     <div>
                       <h3 className="font-semibold text-foreground">{bot.name}</h3>
                       <span
                         className={cn(
                           'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full',
-                          bot.status === 'active'
+                          bot.is_active
                             ? 'bg-success/10 text-success'
                             : 'bg-warning/10 text-warning'
                         )}
                       >
                         <span className={cn(
                           'w-1.5 h-1.5 rounded-full',
-                          bot.status === 'active' ? 'bg-success' : 'bg-warning'
+                          bot.is_active ? 'bg-success' : 'bg-warning'
                         )} />
-                        {bot.status === 'active' ? 'Active' : 'Paused'}
+                        {bot.is_active ? 'Active' : 'Paused'}
                       </span>
                     </div>
                   </div>
@@ -120,13 +233,22 @@ export default function MyChatbots() {
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setOpenMenu(null)} />
                         <div className="absolute right-0 top-full mt-1 w-40 bg-card border border-border rounded-lg shadow-elevation-3 py-1 z-50">
-                          <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent">
+                          <button 
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
+                            onClick={() => handleDuplicateChatbot(bot)}
+                          >
                             <Copy className="w-4 h-4" /> Duplicate
                           </button>
-                          <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent">
-                            <Archive className="w-4 h-4" /> Archive
+                          <button 
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
+                            onClick={() => handleToggleActive(bot.id, bot.is_active)}
+                          >
+                            <Archive className="w-4 h-4" /> {bot.is_active ? 'Pause' : 'Activate'}
                           </button>
-                          <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent">
+                          <button 
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent"
+                            onClick={() => handleDeleteChatbot(bot.id)}
+                          >
                             <Trash2 className="w-4 h-4" /> Delete
                           </button>
                         </div>
@@ -136,25 +258,19 @@ export default function MyChatbots() {
                 </div>
 
                 <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                  {bot.description}
+                  {bot.description || 'No description'}
                 </p>
 
                 <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                   <div>
-                    <p className="text-muted-foreground">Messages Today</p>
-                    <p className="font-semibold text-foreground">{bot.messagesToday}</p>
+                    <p className="text-muted-foreground">Category</p>
+                    <p className="font-semibold text-foreground capitalize">{bot.template_type}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Total Conversations</p>
-                    <p className="font-semibold text-foreground">{bot.totalConversations.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Avg Rating</p>
-                    <p className="font-semibold text-foreground">⭐ {bot.avgRating}/5.0</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Response Time</p>
-                    <p className="font-semibold text-foreground">{bot.responseTime}</p>
+                    <p className="text-muted-foreground">Created</p>
+                    <p className="font-semibold text-foreground">
+                      {new Date(bot.created_at).toLocaleDateString()}
+                    </p>
                   </div>
                 </div>
 
