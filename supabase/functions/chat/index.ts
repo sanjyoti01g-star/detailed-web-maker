@@ -93,6 +93,43 @@ async function callAnthropic(apiKey: string, messages: any[], model: string): Pr
   });
 }
 
+// Message validation constants
+const MAX_MESSAGE_LENGTH = 4000;
+const SUSPICIOUS_PATTERNS = [
+  /ignore\s+(all\s+)?previous\s+instructions?/i,
+  /disregard\s+(all\s+)?previous/i,
+  /you\s+are\s+now\s+a/i,
+  /system\s*:\s*/i,
+  /\[INST\]/i,
+  /<<SYS>>/i,
+];
+
+function validateMessage(message: string): { valid: boolean; error?: string } {
+  if (!message || typeof message !== 'string') {
+    return { valid: false, error: 'Invalid message format' };
+  }
+  
+  const trimmed = message.trim();
+  if (trimmed.length === 0) {
+    return { valid: false, error: 'Message cannot be empty' };
+  }
+  
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return { valid: false, error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.` };
+  }
+  
+  // Check for suspicious prompt injection patterns
+  for (const pattern of SUSPICIOUS_PATTERNS) {
+    if (pattern.test(message)) {
+      console.warn('Suspicious message pattern detected:', pattern.toString());
+      // Log but don't block - just sanitize by continuing
+      break;
+    }
+  }
+  
+  return { valid: true };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -112,6 +149,50 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Validate embed token format
+    if (typeof embedToken !== 'string' || !/^[a-f0-9]+$/i.test(embedToken)) {
+      return new Response(JSON.stringify({ error: 'Invalid embed token format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate message if provided
+    if (message !== undefined) {
+      const validation = validateMessage(message);
+      if (!validation.valid) {
+        return new Response(JSON.stringify({ error: validation.error }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Validate provided messages array if present
+    if (providedMessages !== undefined) {
+      if (!Array.isArray(providedMessages)) {
+        return new Response(JSON.stringify({ error: 'Messages must be an array' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      for (const msg of providedMessages) {
+        if (!msg.role || !msg.content || typeof msg.content !== 'string') {
+          return new Response(JSON.stringify({ error: 'Invalid message format in array' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (msg.content.length > MAX_MESSAGE_LENGTH) {
+          return new Response(JSON.stringify({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.` }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
     }
 
     // Get chatbot by embed token
