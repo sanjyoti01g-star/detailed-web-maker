@@ -1,45 +1,43 @@
 import { useState, useRef } from 'react';
-import { Play, RotateCcw, Code } from 'lucide-react';
+import { Play, RotateCcw, Code, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function DemoEmbed() {
   const [embedCode, setEmbedCode] = useState('');
   const [isRendered, setIsRendered] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const renderEmbed = () => {
-    if (!embedCode.trim() || !previewRef.current) return;
+    if (!embedCode.trim() || !iframeRef.current) return;
 
-    // Clear previous content
-    previewRef.current.innerHTML = '';
+    // Create a safe HTML document for the sandboxed iframe
+    const safeHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; }
+          </style>
+        </head>
+        <body>
+          ${embedCode}
+        </body>
+      </html>
+    `;
 
-    // Create a container for the widget
-    const container = document.createElement('div');
-    container.innerHTML = embedCode;
-
-    // Execute any script tags
-    const scripts = container.querySelectorAll('script');
-    scripts.forEach((script) => {
-      const newScript = document.createElement('script');
-      if (script.src) {
-        newScript.src = script.src;
-        newScript.async = true;
-      } else {
-        newScript.textContent = script.textContent;
-      }
-      document.body.appendChild(newScript);
-    });
-
-    // Append non-script content
-    previewRef.current.appendChild(container);
+    // Use srcdoc to load content in sandboxed iframe
+    iframeRef.current.srcdoc = safeHtml;
     setIsRendered(true);
   };
 
   const resetPreview = () => {
-    if (previewRef.current) {
-      previewRef.current.innerHTML = '';
+    if (iframeRef.current) {
+      iframeRef.current.srcdoc = '';
     }
     setEmbedCode('');
     setIsRendered(false);
@@ -90,25 +88,34 @@ export default function DemoEmbed() {
           </CardContent>
         </Card>
 
+        {/* Security Warning */}
+        <Alert variant="destructive" className="border-amber-500 bg-amber-50">
+          <ShieldAlert className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            <strong>Security Notice:</strong> Only paste embed codes from trusted sources. 
+            The preview runs in a sandboxed environment for your protection.
+          </AlertDescription>
+        </Alert>
+
         {/* Preview Area */}
         <Card className="border-gray-200">
           <CardHeader className="pb-3 border-b border-gray-100">
             <CardTitle className="text-base font-medium text-gray-900">
-              Live Preview
+              Live Preview (Sandboxed)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div 
-              ref={previewRef}
-              className="min-h-[400px] bg-white relative"
-              style={{ isolation: 'isolate' }}
-            >
-              {!isRendered && (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                  <p className="text-sm">Widget will appear here after you click "Render Widget"</p>
-                </div>
-              )}
-            </div>
+            <iframe
+              ref={iframeRef}
+              sandbox="allow-scripts allow-same-origin"
+              className="w-full min-h-[400px] bg-white border-0"
+              title="Widget Preview"
+            />
+            {!isRendered && (
+              <div className="absolute inset-0 flex items-center justify-center text-gray-400 pointer-events-none">
+                <p className="text-sm">Widget will appear here after you click "Render Widget"</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
