@@ -150,6 +150,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   };
 
   const completeOnboarding = () => {
+    // Clear sensitive onboarding data from localStorage
+    localStorage.removeItem('onboardingData');
     localStorage.setItem('onboardingComplete', 'true');
     setIsOnboardingComplete(true);
   };

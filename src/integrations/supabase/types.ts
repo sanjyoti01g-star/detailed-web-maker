@@ -287,6 +287,7 @@ export type Database = {
     }
     Functions: {
       check_and_deduct_credit: { Args: { p_user_id: string }; Returns: boolean }
+      cleanup_old_sessions: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
