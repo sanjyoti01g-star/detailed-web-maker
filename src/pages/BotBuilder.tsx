@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Save, Eye, Settings, FileText, Palette, Brain, Code, Upload, Globe, Plus, X, GripVertical, Copy, Check, Trash2, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowLeft, Save, Eye, Settings, FileText, Palette, Brain, Code, Upload, Globe, Plus, X, GripVertical, Copy, Check, Trash2, Loader2, AlertCircle, CheckCircle, Sparkles, Cloud, CloudOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAutoSave } from '@/hooks/useAutoSave';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: Settings },
@@ -43,6 +44,7 @@ export default function BotBuilder() {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState(false);
   
   // Chatbot data
   const [chatbot, setChatbot] = useState<ChatbotData | null>(null);
@@ -53,6 +55,36 @@ export default function BotBuilder() {
   const [systemPrompt, setSystemPrompt] = useState('');
   const [starters, setStarters] = useState(['What services do you offer?', 'How can I contact support?', 'What are your business hours?']);
   const [primaryColor, setPrimaryColor] = useState('#6750a4');
+
+  // Auto-save callback
+  const performAutoSave = useCallback(async () => {
+    if (!user || !chatbot?.id || isNew) return;
+    
+    const chatbotData = {
+      name: botName.trim(),
+      description: description.trim() || null,
+      avatar: selectedAvatar,
+      template_type: industry || 'custom',
+      system_prompt: systemPrompt.trim() || null,
+      settings: {
+        starters,
+        primaryColor,
+      },
+    };
+
+    const { error } = await supabase
+      .from('chatbots')
+      .update(chatbotData)
+      .eq('id', chatbot.id);
+
+    if (error) throw error;
+  }, [user, chatbot?.id, isNew, botName, description, selectedAvatar, industry, systemPrompt, starters, primaryColor]);
+
+  const { isSaving: autoSaving, lastSaved, hasUnsavedChanges, markDirty, saveNow } = useAutoSave({
+    onSave: performAutoSave,
+    delay: 3000,
+    enabled: !isNew && !!chatbot?.id,
+  });
 
   useEffect(() => {
     if (!isNew && botId) {
@@ -94,6 +126,42 @@ export default function BotBuilder() {
     setLoading(false);
   };
 
+  // Handlers that trigger auto-save
+  const handleBotNameChange = (value: string) => {
+    setBotName(value);
+    markDirty();
+  };
+
+  const handleDescriptionChange = (value: string) => {
+    setDescription(value);
+    markDirty();
+  };
+
+  const handleIndustryChange = (value: string) => {
+    setIndustry(value);
+    markDirty();
+  };
+
+  const handleAvatarChange = (value: string) => {
+    setSelectedAvatar(value);
+    markDirty();
+  };
+
+  const handleSystemPromptChange = (value: string) => {
+    setSystemPrompt(value);
+    markDirty();
+  };
+
+  const handleStartersChange = (newStarters: string[]) => {
+    setStarters(newStarters);
+    markDirty();
+  };
+
+  const handlePrimaryColorChange = (value: string) => {
+    setPrimaryColor(value);
+    markDirty();
+  };
+
   const handleSave = async () => {
     if (!user) {
       toast.error('Please sign in to save');
@@ -133,20 +201,18 @@ export default function BotBuilder() {
 
         if (error) throw error;
 
+        // Show success animation
+        setCreateSuccess(true);
         toast.success('Chatbot created successfully!');
-        // Navigate to the new chatbot's edit page
-        navigate(`/chatbots/${data.id}`, { replace: true });
+        
+        // Navigate after animation
+        setTimeout(() => {
+          navigate(`/chatbots/${data.id}`, { replace: true });
+        }, 1500);
       } else {
-        // Update existing chatbot
-        const { error } = await supabase
-          .from('chatbots')
-          .update(chatbotData)
-          .eq('id', botId);
-
-        if (error) throw error;
-
+        // Update existing chatbot - use saveNow for immediate save
+        await saveNow();
         toast.success('Changes saved!');
-        // Refresh chatbot data
         fetchChatbot();
       }
     } catch (error) {
@@ -157,10 +223,35 @@ export default function BotBuilder() {
     }
   };
 
+  // Success animation overlay
+  if (createSuccess) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
+        <div className="text-center animate-scale-in">
+          <div className="relative mx-auto w-24 h-24 mb-6">
+            <div className="absolute inset-0 rounded-full bg-success/20 animate-ping" />
+            <div className="relative flex items-center justify-center w-24 h-24 rounded-full bg-success/10 border-2 border-success">
+              <CheckCircle className="w-12 h-12 text-success" />
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <h2 className="text-2xl font-bold text-foreground">Chatbot Created!</h2>
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <p className="text-muted-foreground">Redirecting to your new bot...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading chatbot...</p>
+        </div>
       </div>
     );
   }
@@ -182,18 +273,41 @@ export default function BotBuilder() {
               <h1 className="text-xl font-semibold text-foreground">
                 {isNew ? 'Create New Bot' : botName || 'Untitled Bot'}
               </h1>
-              {chatbot && (
-                <span className={cn(
-                  "text-sm flex items-center gap-1",
-                  chatbot.is_active ? "text-success" : "text-warning"
-                )}>
+              <div className="flex items-center gap-2">
+                {chatbot && (
                   <span className={cn(
-                    "w-2 h-2 rounded-full",
-                    chatbot.is_active ? "bg-success" : "bg-warning"
-                  )} />
-                  {chatbot.is_active ? 'Active' : 'Paused'}
-                </span>
-              )}
+                    "text-sm flex items-center gap-1",
+                    chatbot.is_active ? "text-success" : "text-warning"
+                  )}>
+                    <span className={cn(
+                      "w-2 h-2 rounded-full",
+                      chatbot.is_active ? "bg-success" : "bg-warning"
+                    )} />
+                    {chatbot.is_active ? 'Active' : 'Paused'}
+                  </span>
+                )}
+                {/* Auto-save status indicator */}
+                {!isNew && chatbot && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    {autoSaving ? (
+                      <>
+                        <Cloud className="w-3 h-3 animate-pulse" />
+                        Saving...
+                      </>
+                    ) : hasUnsavedChanges ? (
+                      <>
+                        <CloudOff className="w-3 h-3" />
+                        Unsaved changes
+                      </>
+                    ) : lastSaved ? (
+                      <>
+                        <Check className="w-3 h-3 text-success" />
+                        Saved
+                      </>
+                    ) : null}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -204,7 +318,7 @@ export default function BotBuilder() {
               Preview
             </Button>
           )}
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || autoSaving}>
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
@@ -248,7 +362,7 @@ export default function BotBuilder() {
                   <Input
                     id="botName"
                     value={botName}
-                    onChange={(e) => setBotName(e.target.value)}
+                    onChange={(e) => handleBotNameChange(e.target.value)}
                     placeholder="e.g., Customer Support Bot"
                     className="mt-1.5"
                     maxLength={50}
@@ -259,7 +373,7 @@ export default function BotBuilder() {
                   <Textarea
                     id="description"
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(e) => handleDescriptionChange(e.target.value)}
                     placeholder="Describe what your bot will help with..."
                     className="mt-1.5"
                     maxLength={500}
@@ -271,7 +385,7 @@ export default function BotBuilder() {
                   <select
                     id="industry"
                     value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
+                    onChange={(e) => handleIndustryChange(e.target.value)}
                     className="mt-1.5 w-full h-10 px-3 rounded-lg border border-input bg-background"
                   >
                     <option value="">Select an industry</option>
@@ -292,7 +406,7 @@ export default function BotBuilder() {
                   {avatars.map((avatar) => (
                     <button
                       key={avatar}
-                      onClick={() => setSelectedAvatar(avatar)}
+                      onClick={() => handleAvatarChange(avatar)}
                       className={cn(
                         'w-14 h-14 text-2xl rounded-xl border-2 transition-all',
                         selectedAvatar === avatar
@@ -320,14 +434,14 @@ export default function BotBuilder() {
                       onChange={(e) => {
                         const newStarters = [...starters];
                         newStarters[index] = e.target.value;
-                        setStarters(newStarters);
+                        handleStartersChange(newStarters);
                       }}
                     />
                     {starters.length > 1 && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setStarters(starters.filter((_, i) => i !== index))}
+                        onClick={() => handleStartersChange(starters.filter((_, i) => i !== index))}
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -335,7 +449,7 @@ export default function BotBuilder() {
                   </div>
                 ))}
                 {starters.length < 6 && (
-                  <Button variant="ghost" size="sm" onClick={() => setStarters([...starters, ''])}>
+                  <Button variant="ghost" size="sm" onClick={() => handleStartersChange([...starters, ''])}>
                     <Plus className="w-4 h-4" />
                     Add Starter
                   </Button>
@@ -362,12 +476,12 @@ export default function BotBuilder() {
                     type="color"
                     id="primaryColor"
                     value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    onChange={(e) => handlePrimaryColorChange(e.target.value)}
                     className="w-10 h-10 rounded-lg border border-input cursor-pointer"
                   />
                   <Input
                     value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    onChange={(e) => handlePrimaryColorChange(e.target.value)}
                     className="w-28"
                   />
                 </div>
@@ -400,7 +514,7 @@ export default function BotBuilder() {
                 <Textarea
                   id="systemPrompt"
                   value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  onChange={(e) => handleSystemPromptChange(e.target.value)}
                   placeholder="Describe your bot's personality, expertise, and how it should interact with users..."
                   className="mt-1.5 min-h-[150px]"
                 />
