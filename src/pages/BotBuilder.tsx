@@ -199,13 +199,20 @@ export default function BotBuilder() {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error details:', error);
+          throw new Error(error.message || 'Failed to create chatbot');
+        }
+
+        if (!data) {
+          throw new Error('No data returned from insert');
+        }
 
         // Show success animation
         setCreateSuccess(true);
         toast.success('Chatbot created successfully!');
         
-        // Navigate after animation
+        // Navigate after animation with a safety timeout
         setTimeout(() => {
           navigate(`/chatbots/${data.id}`, { replace: true });
         }, 1500);
@@ -217,7 +224,9 @@ export default function BotBuilder() {
       }
     } catch (error) {
       console.error('Save error:', error);
-      toast.error('Failed to save chatbot');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save chatbot';
+      toast.error(errorMessage);
+      setCreateSuccess(false); // Reset success state if it was set
     } finally {
       setSaving(false);
     }

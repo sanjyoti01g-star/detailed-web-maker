@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { OnboardingProgress } from './OnboardingProgress';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 const industries = [
   'Customer Support',
@@ -25,16 +29,84 @@ const avatars = ['🤖', '💬', '🎯', '🚀', '💡', '⭐', '🔥', '💎'];
 
 export function InitialSetupScreen() {
   const { setStep, data, updateBotSetup, completeOnboarding } = useOnboarding();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedAvatar, setSelectedAvatar] = useState(data.bot.avatar);
   const [starters, setStarters] = useState(data.bot.starters);
   const [industry, setIndustry] = useState(data.business.industry || '');
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const isValid = data.bot.botName && industry;
 
-  const handleComplete = () => {
-    updateBotSetup({ avatar: selectedAvatar, starters });
-    completeOnboarding();
+  const handleComplete = async () => {
+    if (!user) {
+      toast.error('Please sign in to create your bot');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      // Save the bot to the database
+      const { data: newBot, error } = await supabase
+        .from('chatbots')
+        .insert({
+          user_id: user.id,
+          name: data.bot.botName || 'My First Bot',
+          description: data.bot.botDescription || null,
+          avatar: selectedAvatar,
+          template_type: industry || 'custom',
+          settings: { starters: starters.filter(s => s.trim()) },
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating bot:', error);
+        throw new Error(error.message);
+      }
+
+      // Update local state
+      updateBotSetup({ avatar: selectedAvatar, starters });
+      
+      // Show success animation
+      setSuccess(true);
+      toast.success('Your bot has been created!');
+
+      // Complete onboarding and navigate after animation
+      setTimeout(() => {
+        completeOnboarding();
+        navigate(`/chatbots/${newBot.id}`);
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to create bot:', error);
+      toast.error('Failed to create bot. Please try again.');
+      setSaving(false);
+    }
   };
+
+  // Success animation overlay
+  if (success) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
+        <div className="text-center animate-scale-in">
+          <div className="relative mx-auto w-24 h-24 mb-6">
+            <div className="absolute inset-0 rounded-full bg-success/20 animate-ping" />
+            <div className="relative flex items-center justify-center w-24 h-24 rounded-full bg-success/10 border-2 border-success">
+              <CheckCircle className="w-12 h-12 text-success" />
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <h2 className="text-2xl font-bold text-foreground">Bot Created!</h2>
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <p className="text-muted-foreground">Redirecting to your new bot...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -150,16 +222,26 @@ export function InitialSetupScreen() {
               </div>
 
               <div className="pt-4 flex gap-3">
-                <Button type="submit" variant="hero" className="flex-1" disabled={!isValid}>
-                  Complete Setup
-                  <ArrowRight className="w-4 h-4" />
+                <Button type="submit" variant="hero" className="flex-1" disabled={!isValid || saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      Complete Setup
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </Button>
               </div>
               
               <button
                 type="button"
-                className="w-full text-sm text-muted-foreground hover:text-foreground"
+                className="w-full text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
                 onClick={handleComplete}
+                disabled={saving}
               >
                 Skip this step
               </button>
